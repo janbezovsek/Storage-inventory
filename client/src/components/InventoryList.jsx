@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { parseExcelToItems } from '../utils/excelParser'
+import { useRef, useState } from 'react'
 import {
 Box, Flex, Text, Input, InputGroup, InputLeftElement,
 Select, Button, SimpleGrid, Stat, StatLabel, StatNumber,
@@ -14,6 +15,25 @@ const [items, setItems] = useState(mockItems)
 const [search, setSearch] = useState('')
 const [category, setCategory] = useState('All')
 const [openId, setOpenId] = useState(null)
+
+const importRef = useRef()
+const [importing, setImporting] = useState(false)
+
+const handleImport = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  setImporting(true)
+  try {
+    const parsed = await parseExcelToItems(file)
+    setItems(parsed)
+    setOpenId(null)
+  } catch (err) {
+    console.error('Import failed:', err)
+  } finally {
+    setImporting(false)
+    importRef.current.value = ''
+  }
+}
 
 const categories = ['All', ...Array.from(new Set(items.map(i => i.category)))]
 
@@ -100,14 +120,27 @@ return (
     </Select>
 
     {isAdmin && (
-        <Button
-            leftIcon={<LuUpload size={14} />}
-            colorScheme="blue"
-            size="sm"
-            ml="auto"
-        >
-            Import Excel
-        </Button>
+  <>
+    <input
+      type="file"
+      accept=".xlsx, .xls"
+      ref={importRef}
+      style={{ display: 'none' }}
+      onChange={handleImport}
+    />
+    <Button
+      leftIcon={<LuUpload size={14} />}
+      colorScheme="blue"
+      size="sm"
+      ml="auto"
+      isLoading={importing}
+      loadingText="Importing..."
+      onClick={() => importRef.current.click()}
+    >
+      Import Excel
+    </Button>
+  </>
+
         )}
 </Flex>
 
