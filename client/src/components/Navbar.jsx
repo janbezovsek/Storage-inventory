@@ -34,7 +34,7 @@ export default function Navbar() {
               letterSpacing="-0.03em"
               color="gray.800"
             >
-              StorageBase
+              Skladišče Logatec
             </Text>
           </Flex>
 

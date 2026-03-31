@@ -13,19 +13,21 @@ export function parseExcelToItems(file) {
           const items = rows
             .filter(row => row[0] && row[1]) // skip empty rows
             .map((row, index) => {
-              const name = String(row[0]).trim()
-              const totalQty = Number(row[1])
-              const palletRaw = row[2] ? String(row[2]).trim() : ''
-              const pallets = parsePallets(palletRaw)
+  const name = String(row[0]).trim()
+  const totalQty = Number(row[1])
+  const palletRaw = row[2] ? String(row[2]).trim() : ''
+  const pallets = parsePallets(palletRaw)
+  const category = row[3] ? String(row[3]).trim() : 'Uncategorized'  // ← add this
 
-              return {
-                id: index + 1,
-                name,
-                totalQty,
-                pallets,
-                photo: null,
-              }
-            })
+  return {
+    id: index + 1,
+    name,
+    totalQty,
+    pallets,
+    category,   // ← add this
+    photo: null,
+  }
+})
 
           resolve(items)
         })
