@@ -8,26 +8,27 @@ import { useAdmin } from '../hooks/useAdmin'
 
 export default function AdminLoginModal({ isOpen, onClose }) {
   const { login } = useAdmin()
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setLoading(true)
-    setTimeout(() => {
-      const success = login(password)
-      if (success) {
-        setPassword('')
-        setError('')
-        onClose()
-      } else {
-        setError('Incorrect password.')
-      }
-      setLoading(false)
-    }, 400)
+    setError('')
+    const success = await login(username, password)
+    if (success) {
+      setUsername('')
+      setPassword('')
+      onClose()
+    } else {
+      setError('Incorrect username or password.')
+    }
+    setLoading(false)
   }
 
   const handleClose = () => {
+    setUsername('')
     setPassword('')
     setError('')
     onClose()
@@ -42,8 +43,16 @@ export default function AdminLoginModal({ isOpen, onClose }) {
         <ModalBody>
           <VStack spacing={3} align="stretch">
             <Text fontSize="sm" color="gray.500">
-              Enter the admin password to enable editing.
+              Enter your admin credentials to enable editing.
             </Text>
+            <Input
+              placeholder="Username"
+              value={username}
+              onChange={e => { setUsername(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              focusBorderColor="blue.400"
+              size="md"
+            />
             <Input
               type="password"
               placeholder="Password"
@@ -59,15 +68,8 @@ export default function AdminLoginModal({ isOpen, onClose }) {
           </VStack>
         </ModalBody>
         <ModalFooter gap={2}>
-          <Button variant="ghost" size="sm" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            colorScheme="blue"
-            size="sm"
-            onClick={handleLogin}
-            isLoading={loading}
-          >
+          <Button variant="ghost" size="sm" onClick={handleClose}>Cancel</Button>
+          <Button colorScheme="blue" size="sm" onClick={handleLogin} isLoading={loading}>
             Sign in
           </Button>
         </ModalFooter>

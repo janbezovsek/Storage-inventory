@@ -1,6 +1,7 @@
 import express from 'express'
 import multer from 'multer'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import {
   getItems,
   importItems,
@@ -9,14 +10,15 @@ import {
 } from '../controllers/itemController.js'
 import { requireAdmin } from '../middleware/authMiddleware.js'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
 const router = express.Router()
 
-// multer config for Excel imports (temp storage)
 const excelUpload = multer({ dest: 'temp/' })
 
-// multer config for photos (permanent storage)
 const photoStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
+  destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname)
     cb(null, `item-${req.params.id}-${Date.now()}${ext}`)
@@ -24,10 +26,9 @@ const photoStorage = multer.diskStorage({
 })
 const photoUpload = multer({ storage: photoStorage })
 
-// Routes
-router.get('/',                                         getItems)
+router.get('/', getItems)
 router.post('/import', requireAdmin, excelUpload.single('file'), importItems)
 router.post('/:id/photo', requireAdmin, photoUpload.single('photo'), uploadPhoto)
-router.delete('/:id/photo', requireAdmin,               deletePhoto)
+router.delete('/photo/:photoId', requireAdmin, deletePhoto)
 
 export default router

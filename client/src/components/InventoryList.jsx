@@ -1,58 +1,94 @@
-import { parseExcelToItems } from '../utils/excelParser'
-import { useRef, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
-Box, Flex, Text, Input, InputGroup, InputLeftElement,
-Select, Button, SimpleGrid, Stat, StatLabel, StatNumber,
+  Box, Flex, Text, Input, InputGroup, InputLeftElement,
+  Select, Button, SimpleGrid, Stat, StatLabel, StatNumber,
+  Alert, AlertIcon, AlertDescription, CloseButton, Spinner, useToast,
 } from '@chakra-ui/react'
-import { LuSearch, LuUpload } from 'react-icons/lu'
-import { mockItems } from '../data/mockItems'
+import { LuSearch, LuUpload, LuRotateCcw } from 'react-icons/lu'
 import { useAdmin } from '../hooks/useAdmin'
 import InventoryRow from './InventoryRow'
+import { fetchItems, importItemsFromExcel } from '../services/api'
 
 export default function InventoryList() {
-const { isAdmin } = useAdmin()
-const [items, setItems] = useState(mockItems)
-const [search, setSearch] = useState('')
-const [category, setCategory] = useState('All')
-const [openId, setOpenId] = useState(null)
+  const { isAdmin, token } = useAdmin()
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('All')
+  const [openId, setOpenId] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const importRef = useRef()
+  const toast = useToast()
 
-const importRef = useRef()
-const [importing, setImporting] = useState(false)
+  // fetch on mount
+  useEffect(() => {
+    loadItems()
+  }, [])
 
-const handleImport = async (e) => {
+  const loadItems = async () => {
+    setLoading(true)
+    try {
+      const data = await fetchItems()
+      setItems(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const categories = ['All', ...Array.from(new Set(items.map(i => i.category)))]
+
+  const filtered = items.filter(item => {
+  const matchName = item.name.toLowerCase().includes(search.toLowerCase())
+  const matchPallet = item.pallets.some(p =>
+    p.num.toLowerCase().includes(search.toLowerCase())
+  )
+  const matchSearch = matchName || matchPallet
+  const matchCat = category === 'All' || item.category === category
+  return matchSearch && matchCat
+})
+
+  const handleImport = async (e) => {
   const file = e.target.files[0]
   if (!file) return
   setImporting(true)
   try {
-    const parsed = await parseExcelToItems(file)
-    setItems(parsed)
+    await importItemsFromExcel(file, token)
+    await loadItems()
     setOpenId(null)
-  } catch (err) {
-    console.error('Import failed:', err)
+    toast({
+      title: 'Import successful',
+      description: 'Inventory has been updated from your Excel file.',
+      status: 'success',
+      duration: 4000,
+      isClosable: true,
+      position: 'top-right',
+    })
+  } catch {
+    toast({
+      title: 'Import failed',
+      description: 'Check your Excel format and try again.',
+      status: 'error',
+      duration: 4000,
+      isClosable: true,
+      position: 'top-right',
+    })
   } finally {
     setImporting(false)
     importRef.current.value = ''
   }
 }
 
-const categories = ['All', ...Array.from(new Set(items.map(i => i.category)))]
+  const highestPallet = items
+  .flatMap(i => i.pallets.map(p => p.num))
+  .map(num => parseInt(num.replace(/\D/g, '')))
+  .filter(n => !isNaN(n))
+  .reduce((max, n) => Math.max(max, n), 0)
 
-const filtered = items.filter(item => {
-    const matchSearch = item.name.toLowerCase().includes(search.toLowerCase())
-    const matchCat = category === 'All' || item.category === category
-    return matchSearch && matchCat
-})
+const highestPalletLabel = highestPallet > 0 ? `P${highestPallet}` : '—'
 
-const handlePhotoUpdate = (id, photoUrl) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, photo: photoUrl } : i))
-}
-
-const handlePhotoDelete = (id) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, photo: null } : i))
-}
-
-const totalQty = items.reduce((sum, i) => sum + i.totalQty, 0)
-const totalPallets = new Set(items.flatMap(i => i.pallets.map(p => p.num))).size
+  const totalPallets = new Set(items.flatMap(i => i.pallets.map(p => p.num))).size
 
 return (
 
@@ -72,7 +108,7 @@ return (
 <SimpleGrid columns={3} spacing={3} mb={6}>
     {[
     { label: 'Total Items',   value: items.length },
-    { label: 'Total Qty',     value: totalQty.toLocaleString() },
+    { label: 'Last pallet',     value: highestPalletLabel },
     { label: 'Pallets Used',  value: totalPallets },
     ].map(stat => (
 <Box key={stat.label} bg="white" border="1px solid" borderColor="gray.200"
@@ -97,7 +133,7 @@ return (
         <LuSearch size={15} />
     </InputLeftElement>
         <Input
-            placeholder="Search items..."
+            placeholder="Search by item or pallet (e.g. P12)..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             bg="white"
@@ -172,23 +208,27 @@ return (
         ))}
         </Flex>
 
-        {filtered.length === 0 ? (
-        <Box py={12} textAlign="center">
-        <Text color="gray.400" fontSize="sm">No items match your search.</Text>
-        </Box>
-        ) : (
-        filtered.map((item, index) => (
-            <InventoryRow
-            key={item.id}
-            item={item}
-            isOpen={openId === item.id}
-            onToggle={() => setOpenId(openId === item.id ? null : item.id)}
-            onPhotoUpdate={handlePhotoUpdate}
-            onPhotoDelete={handlePhotoDelete}
-            isLast={index === filtered.length - 1}
-            />
-        ))
-    )}
+        {loading ? (
+  <Flex justify="center" py={12}>
+    <Spinner color="blue.400" />
+  </Flex>
+) : filtered.length === 0 ? (
+  <Box py={12} textAlign="center">
+    <Text color="gray.400" fontSize="sm">No items match your search.</Text>
+  </Box>
+) : (
+  filtered.map((item, index) => (
+    <InventoryRow
+      key={item.id}
+      item={item}
+      isOpen={openId === item.id}
+      onToggle={() => setOpenId(openId === item.id ? null : item.id)}
+      onPhotoUpdate={loadItems}
+      onPhotoDelete={loadItems}
+      isLast={index === filtered.length - 1}
+    />
+  ))
+)}
     </Box>
     </Box>
 )

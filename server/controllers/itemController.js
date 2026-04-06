@@ -1,16 +1,27 @@
 import pool from '../config/db.js'
-import * as xlsx from 'xlsx'
+import { createRequire } from 'module'
 import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const require = createRequire(import.meta.url)
+const xlsx = require('xlsx')
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // GET /api/items — public
 export async function getItems(req, res) {
   try {
     const [items] = await pool.query('SELECT * FROM items ORDER BY name ASC')
 
-    // fetch pallets for each item
-    const itemsWithPallets = await Promise.all(items.map(async (item) => {
+    const itemsWithDetails = await Promise.all(items.map(async (item) => {
       const [pallets] = await pool.query(
         'SELECT pallet_num AS num, qty FROM pallets WHERE item_id = ?',
+        [item.id]
+      )
+      const [photos] = await pool.query(
+        'SELECT id, filename FROM photos WHERE item_id = ? ORDER BY created_at ASC',
         [item.id]
       )
       return {
@@ -18,12 +29,15 @@ export async function getItems(req, res) {
         name: item.name,
         totalQty: item.total_qty,
         category: item.category,
-        photo: item.photo,
         pallets,
+        photos: photos.map(p => ({
+          id: p.id,
+          url: `/uploads/${p.filename}`,
+        })),
       }
     }))
 
-    res.json(itemsWithPallets)
+    res.json(itemsWithDetails)
   } catch (err) {
     console.error(err)
     res.status(500).json({ message: 'Server error' })
@@ -45,7 +59,6 @@ export async function importItems(req, res) {
     try {
       await conn.beginTransaction()
 
-      // Clear existing data
       await conn.query('DELETE FROM pallets')
       await conn.query('DELETE FROM items')
 
@@ -64,7 +77,6 @@ export async function importItems(req, res) {
 
         const itemId = result.insertId
 
-        // parse and insert pallets
         if (palletRaw) {
           const pallets = parsePallets(palletRaw)
           for (const pallet of pallets) {
@@ -88,7 +100,6 @@ export async function importItems(req, res) {
     console.error(err)
     res.status(500).json({ message: 'Import failed' })
   } finally {
-    // clean up uploaded temp file
     fs.unlink(req.file.path, () => {})
   }
 }
@@ -101,30 +112,33 @@ export async function uploadPhoto(req, res) {
   }
 
   try {
-    const photoPath = `/uploads/${req.file.filename}`
-    await pool.query('UPDATE items SET photo = ? WHERE id = ?', [photoPath, id])
-    res.json({ photo: photoPath })
+    const [result] = await pool.query(
+      'INSERT INTO photos (item_id, filename) VALUES (?, ?)',
+      [id, req.file.filename]
+    )
+    res.json({
+      id: result.insertId,
+      url: `/uploads/${req.file.filename}`,
+    })
   } catch (err) {
     console.error(err)
     res.status(500).json({ message: 'Server error' })
   }
 }
 
-// DELETE /api/items/:id/photo — admin only
+// DELETE /api/items/:id/photo/:photoId — admin only
 export async function deletePhoto(req, res) {
-  const { id } = req.params
+  const { photoId } = req.params
 
   try {
-    const [rows] = await pool.query('SELECT photo FROM items WHERE id = ?', [id])
-    if (rows.length === 0) return res.status(404).json({ message: 'Item not found' })
+    const [rows] = await pool.query('SELECT filename FROM photos WHERE id = ?', [photoId])
+    if (rows.length === 0) return res.status(404).json({ message: 'Photo not found' })
 
-    const photoPath = rows[0].photo
-    if (photoPath) {
-      const filePath = `.${photoPath}`
-      fs.unlink(filePath, () => {})
-    }
+    const filename = rows[0].filename
+    const filePath = path.join(__dirname, '../uploads', filename)
+    fs.unlink(filePath, () => {})
 
-    await pool.query('UPDATE items SET photo = NULL WHERE id = ?', [id])
+    await pool.query('DELETE FROM photos WHERE id = ?', [photoId])
     res.json({ message: 'Photo deleted' })
   } catch (err) {
     console.error(err)
@@ -132,7 +146,6 @@ export async function deletePhoto(req, res) {
   }
 }
 
-// helper — same logic as frontend parser
 function parsePallets(palletString) {
   if (!palletString) return []
   return palletString
