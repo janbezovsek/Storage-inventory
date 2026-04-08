@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Box, Flex, Text, Input, InputGroup, InputLeftElement,
   Select, Button, SimpleGrid, Stat, StatLabel, StatNumber,
-  Alert, AlertIcon, AlertDescription, CloseButton, Spinner, useToast,
+  Alert, AlertIcon, AlertDescription, CloseButton, Spinner, useToast,  Badge,
 } from '@chakra-ui/react'
 import { LuSearch, LuUpload, LuRotateCcw } from 'react-icons/lu'
 import { useAdmin } from '../hooks/useAdmin'
@@ -90,6 +90,19 @@ const highestPalletLabel = highestPallet > 0 ? `P${highestPallet}` : '—'
 
   const totalPallets = new Set(items.flatMap(i => i.pallets.map(p => p.num))).size
 
+  const allUsedNums = items
+  .flatMap(i => i.pallets.map(p => parseInt(p.num.replace(/\D/g, ''))))
+  .filter(n => !isNaN(n))
+
+const usedSet = new Set(allUsedNums)
+
+const emptyPallets = []
+for (let i = 1; i <= highestPallet; i++) {
+  if (!usedSet.has(i)) {
+    emptyPallets.push(`P${i}`)
+  }
+}
+
 return (
 
 <Box maxW="900px" mx="auto" px={{ base: 4, md: 8 }} py={6}>
@@ -125,6 +138,44 @@ return (
 </Box>
     ))}
 </SimpleGrid>
+
+{isAdmin && emptyPallets.length > 0 && (
+  <Box
+    bg="white"
+    border="1px solid"
+    borderColor="gray.200"
+    borderRadius="xl"
+    p={4}
+    mb={5}
+  >
+    <Flex align="center" justify="space-between" mb={3}>
+      <Text fontSize="xs" fontWeight="600" color="gray.500"
+        textTransform="uppercase" letterSpacing="0.08em">
+        Empty Pallets
+      </Text>
+      <Badge colorScheme="orange" fontSize="0.7rem" px={2} py={1} borderRadius="md">
+        {emptyPallets.length} empty
+      </Badge>
+    </Flex>
+    <Flex flexWrap="wrap" gap={2}>
+      {emptyPallets.map(p => (
+        <Box
+          key={p}
+          px={3} py={1}
+          bg="orange.50"
+          border="1px solid"
+          borderColor="orange.200"
+          borderRadius="md"
+          fontSize="sm"
+          color="orange.600"
+          fontWeight="500"
+        >
+          {p}
+        </Box>
+      ))}
+    </Flex>
+  </Box>
+)}
 
       {/* Controls */}
 <Flex gap={3} mb={4} flexWrap="wrap">

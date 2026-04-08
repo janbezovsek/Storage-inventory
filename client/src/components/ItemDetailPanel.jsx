@@ -216,7 +216,7 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
       <Modal isOpen={lightboxOpen} onClose={() => setLightboxOpen(false)}
         size="xl" isCentered>
         <ModalOverlay bg="blackAlpha.800" />
-        <ModalContent bg="transparent" boxShadow="none">
+        <ModalContent bg="transparent" boxShadow="none" maxW="90vw">
           <ModalCloseButton color="white" zIndex={10} />
           <Flex align="center" justify="center" position="relative" px={10}>
 
@@ -239,8 +239,8 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
               <Image
                 src={`http://localhost:5001${photos[lightboxIndex].url}`}
                 alt={item.name}
-                maxH="80vh"
-                maxW="100%"
+                maxH="90vh"
+                maxW="85vW"
                 objectFit="contain"
                 borderRadius="lg"
               />
