@@ -29,6 +29,7 @@ export async function getItems(req, res) {
         name: item.name,
         totalQty: item.total_qty,
         category: item.category,
+        notes: item.notes || '',
         pallets,
         photos: photos.map(p => ({
           id: p.id,
@@ -59,9 +60,6 @@ export async function importItems(req, res) {
     try {
       await conn.beginTransaction()
 
-      await conn.query('DELETE FROM pallets')
-      await conn.query('DELETE FROM items')
-
       for (const row of rows) {
         if (!row[0] || !row[1]) continue
 
@@ -69,13 +67,34 @@ export async function importItems(req, res) {
         const totalQty = Number(row[1])
         const palletRaw = row[2] ? String(row[2]).trim() : ''
         const category = row[3] ? String(row[3]).trim() : 'Uncategorized'
+        const notes = row[4] ? String(row[4]).trim() : ''
+        
 
-        const [result] = await conn.query(
-          'INSERT INTO items (name, total_qty, category) VALUES (?, ?, ?)',
-          [name, totalQty, category]
+        // check if item already exists by name
+        const [existing] = await conn.query(
+          'SELECT id FROM items WHERE name = ?', [name]
         )
 
-        const itemId = result.insertId
+        let itemId
+
+        if (existing.length > 0) {
+          // update existing item — photos are preserved
+          itemId = existing[0].id
+          await conn.query(
+            'UPDATE items SET total_qty = ?, category = ?, notes = ? WHERE id = ?',
+            [totalQty, category, notes, itemId]
+          )
+        } else {
+          // insert new item
+          const [result] = await conn.query(
+            'INSERT INTO items (name, total_qty, category, notes) VALUES (?, ?, ?, ?)',
+            [name, totalQty, category, notes]
+          )
+          itemId = result.insertId
+        }
+
+        // always replace pallets since they may have changed
+        await conn.query('DELETE FROM pallets WHERE item_id = ?', [itemId])
 
         if (palletRaw) {
           const pallets = parsePallets(palletRaw)
@@ -153,9 +172,17 @@ function parsePallets(palletString) {
     .map(e => e.trim())
     .filter(Boolean)
     .map(entry => {
-      const match = entry.match(/^(\S+)\((\d+)\)$/)
-      if (!match) return null
-      return { num: match[1], qty: Number(match[2]) }
+      // matches P81(40) — pallet with quantity
+      const withQty = entry.match(/^([A-Za-z]\d+)\((\d+)\)$/)
+      if (withQty) {
+        return { num: withQty[1], qty: Number(withQty[2]) }
+      }
+      // matches P81 — pallet without quantity
+      const withoutQty = entry.match(/^([A-Za-z]\d+)$/)
+      if (withoutQty) {
+        return { num: withoutQty[1], qty: 0 }
+      }
+      return null
     })
     .filter(Boolean)
 }

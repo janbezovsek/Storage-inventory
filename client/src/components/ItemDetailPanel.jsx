@@ -125,6 +125,25 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
               )
             })}
           </Flex>
+          {/* Notes */}
+{(item.notes || isAdmin) && (
+  <>
+    <Divider borderColor="blue.100" my={4} />
+    <Text fontSize="xs" fontWeight="600" color="gray.500"
+      textTransform="uppercase" letterSpacing="0.08em" mb={2}>
+      Notes
+    </Text>
+    {item.notes ? (
+      <Text fontSize="sm" color="gray.700" whiteSpace="pre-wrap">
+        {item.notes}
+      </Text>
+    ) : (
+      <Text fontSize="sm" color="gray.400" fontStyle="italic">
+        No notes for this item.
+      </Text>
+    )}
+  </>
+)}
         </Box>
 
         {/* Right — photos */}

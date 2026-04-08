@@ -53,4 +53,15 @@ describe('parsePallets', () => {
     expect(parsePallets('P12(10)')).toEqual([{ num: 'P12', qty: 10 }])
   })
 
+  it('handles pallet without quantity', () => {
+  expect(parsePallets('P81')).toEqual([{ num: 'P81', qty: 0 }])
+})
+
+it('handles mix of pallets with and without quantity', () => {
+  expect(parsePallets('P81, P12(40)')).toEqual([
+    { num: 'P81', qty: 0 },
+    { num: 'P12', qty: 40 },
+  ])
+})
+
 })

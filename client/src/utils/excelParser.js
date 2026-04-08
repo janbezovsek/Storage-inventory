@@ -18,13 +18,15 @@ export function parseExcelToItems(file) {
   const palletRaw = row[2] ? String(row[2]).trim() : ''
   const pallets = parsePallets(palletRaw)
   const category = row[3] ? String(row[3]).trim() : 'Uncategorized'  // ← add this
+  const notes = row[4] ? String(row[4]).trim() : ''
 
   return {
     id: index + 1,
     name,
     totalQty,
     pallets,
-    category,   // ← add this
+    category,
+    notes,
     photo: null,
   }
 })
@@ -45,18 +47,22 @@ export function parseExcelToItems(file) {
 // [{ num: 'P12', qty: 40 }, { num: 'P7', qty: 60 }, { num: 'P3', qty: 50 }]
 export function parsePallets(palletString) {
   if (!palletString) return []
-
   return palletString
     .split(',')
-    .map(entry => entry.trim())
+    .map(e => e.trim())
     .filter(Boolean)
     .map(entry => {
-      const match = entry.match(/^(\S+)\((\d+)\)$/)
-      if (!match) return null
-      return {
-        num: match[1],
-        qty: Number(match[2]),
+      // matches P81(40) — pallet with quantity
+      const withQty = entry.match(/^([A-Za-z]\d+)\((\d+)\)$/)
+      if (withQty) {
+        return { num: withQty[1], qty: Number(withQty[2]) }
       }
+      // matches P81 — pallet without quantity
+      const withoutQty = entry.match(/^([A-Za-z]\d+)$/)
+      if (withoutQty) {
+        return { num: withoutQty[1], qty: 0 }
+      }
+      return null
     })
     .filter(Boolean)
 }
