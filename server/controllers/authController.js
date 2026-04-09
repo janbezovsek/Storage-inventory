@@ -5,7 +5,7 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 export async function login(req, res) {
-  console.log('Login attempt:', req.body)
+  
   const { username, password } = req.body
 
   if (!username || !password) {
