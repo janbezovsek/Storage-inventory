@@ -9,7 +9,7 @@ dotenv.config()
 const app = express()
 
 app.use(cors({
-  origin: '*',
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'HEAD', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
