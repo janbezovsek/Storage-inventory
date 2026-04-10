@@ -54,14 +54,16 @@ export default function InventoryList() {
   if (!file) return
   setImporting(true)
   try {
-    await importItemsFromExcel(file, token)
+    const result = await importItemsFromExcel(file, token)
     await loadItems()
     setOpenId(null)
     toast({
       title: 'Import successful',
-      description: 'Inventory has been updated from your Excel file.',
+      description: result.deleted?.length > 0
+        ? `Updated inventory. Removed: ${result.deleted.join(', ')}`
+        : 'Inventory has been updated from your Excel file.',
       status: 'success',
-      duration: 4000,
+      duration: 5000,
       isClosable: true,
       position: 'top-right',
     })
