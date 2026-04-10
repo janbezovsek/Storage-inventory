@@ -56,10 +56,35 @@ export async function importItems(req, res) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
     const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 })
 
+    // collect all valid names from the Excel file
+    const excelNames = rows
+      .filter(row => row[0] && row[1])
+      .map(row => String(row[0]).trim())
+
     const conn = await pool.getConnection()
     try {
       await conn.beginTransaction()
 
+      // find items in DB that are no longer in Excel
+      const [existingItems] = await conn.query('SELECT id, name FROM items')
+      const itemsToDelete = existingItems.filter(
+        item => !excelNames.includes(item.name)
+      )
+
+      // delete removed items — clean up their photos from disk first
+      for (const item of itemsToDelete) {
+        const [photos] = await conn.query(
+          'SELECT filename FROM photos WHERE item_id = ?',
+          [item.id]
+        )
+        for (const photo of photos) {
+          const filePath = path.join(__dirname, '../uploads', photo.filename)
+          fs.unlink(filePath, () => {})
+        }
+        await conn.query('DELETE FROM items WHERE id = ?', [item.id])
+      }
+
+      // now process all rows from Excel — update or insert
       for (const row of rows) {
         if (!row[0] || !row[1]) continue
 
@@ -68,9 +93,7 @@ export async function importItems(req, res) {
         const palletRaw = row[2] ? String(row[2]).trim() : ''
         const category = row[3] ? String(row[3]).trim() : 'Uncategorized'
         const notes = row[4] ? String(row[4]).trim() : ''
-        
 
-        // check if item already exists by name
         const [existing] = await conn.query(
           'SELECT id FROM items WHERE name = ?', [name]
         )
@@ -78,14 +101,12 @@ export async function importItems(req, res) {
         let itemId
 
         if (existing.length > 0) {
-          // update existing item — photos are preserved
           itemId = existing[0].id
           await conn.query(
             'UPDATE items SET total_qty = ?, category = ?, notes = ? WHERE id = ?',
             [totalQty, category, notes, itemId]
           )
         } else {
-          // insert new item
           const [result] = await conn.query(
             'INSERT INTO items (name, total_qty, category, notes) VALUES (?, ?, ?, ?)',
             [name, totalQty, category, notes]
@@ -93,7 +114,7 @@ export async function importItems(req, res) {
           itemId = result.insertId
         }
 
-        // always replace pallets since they may have changed
+        // always replace pallets
         await conn.query('DELETE FROM pallets WHERE item_id = ?', [itemId])
 
         if (palletRaw) {
@@ -108,7 +129,10 @@ export async function importItems(req, res) {
       }
 
       await conn.commit()
-      res.json({ message: 'Import successful' })
+      res.json({
+        message: 'Import successful',
+        deleted: itemsToDelete.map(i => i.name),
+      })
     } catch (err) {
       await conn.rollback()
       throw err
