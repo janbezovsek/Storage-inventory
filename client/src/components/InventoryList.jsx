@@ -42,7 +42,7 @@ export default function InventoryList() {
   const filtered = items.filter(item => {
   const matchName = item.name.toLowerCase().includes(search.toLowerCase())
   const matchPallet = item.pallets.some(p =>
-    p.num.toLowerCase().includes(search.toLowerCase())
+    p.num.toLowerCase() === search.toLowerCase()
   )
   const matchSearch = matchName || matchPallet
   const matchCat = category === 'All' || item.category === category

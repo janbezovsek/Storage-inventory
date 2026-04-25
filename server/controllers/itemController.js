@@ -56,7 +56,6 @@ export async function importItems(req, res) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
     const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 })
 
-    // collect all valid names from the Excel file
     const excelNames = rows
       .filter(row => row[0] && row[1])
       .map(row => String(row[0]).trim())
@@ -65,13 +64,12 @@ export async function importItems(req, res) {
     try {
       await conn.beginTransaction()
 
-      // find items in DB that are no longer in Excel
+      // find and delete items no longer in Excel
       const [existingItems] = await conn.query('SELECT id, name FROM items')
       const itemsToDelete = existingItems.filter(
         item => !excelNames.includes(item.name)
       )
 
-      // delete removed items — clean up their photos from disk first
       for (const item of itemsToDelete) {
         const [photos] = await conn.query(
           'SELECT filename FROM photos WHERE item_id = ?',
@@ -84,7 +82,7 @@ export async function importItems(req, res) {
         await conn.query('DELETE FROM items WHERE id = ?', [item.id])
       }
 
-      // now process all rows from Excel — update or insert
+      // process all rows from Excel
       for (const row of rows) {
         if (!row[0] || !row[1]) continue
 
@@ -169,13 +167,17 @@ export async function uploadPhoto(req, res) {
   }
 }
 
-// DELETE /api/items/:id/photo/:photoId — admin only
+// DELETE /api/items/photo/:photoId — admin only
 export async function deletePhoto(req, res) {
   const { photoId } = req.params
 
   try {
-    const [rows] = await pool.query('SELECT filename FROM photos WHERE id = ?', [photoId])
-    if (rows.length === 0) return res.status(404).json({ message: 'Photo not found' })
+    const [rows] = await pool.query(
+      'SELECT filename FROM photos WHERE id = ?', [photoId]
+    )
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Photo not found' })
+    }
 
     const filename = rows[0].filename
     const filePath = path.join(__dirname, '../uploads', filename)
@@ -189,6 +191,7 @@ export async function deletePhoto(req, res) {
   }
 }
 
+// helper
 function parsePallets(palletString) {
   if (!palletString) return []
   return palletString
@@ -196,12 +199,10 @@ function parsePallets(palletString) {
     .map(e => e.trim())
     .filter(Boolean)
     .map(entry => {
-      // matches P81(40) — pallet with quantity
       const withQty = entry.match(/^([A-Za-z]\d+)\((\d+)\)$/)
       if (withQty) {
         return { num: withQty[1], qty: Number(withQty[2]) }
       }
-      // matches P81 — pallet without quantity
       const withoutQty = entry.match(/^([A-Za-z]\d+)$/)
       if (withoutQty) {
         return { num: withoutQty[1], qty: 0 }

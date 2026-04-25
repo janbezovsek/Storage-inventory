@@ -110,7 +110,9 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
 
           <Flex direction="column" gap={2}>
             {item.pallets.map(p => {
-              const pct = Math.round((p.qty / item.totalQty) * 100)
+              const pct = item.totalQty > 0
+                ? Math.round((p.qty / item.totalQty) * 100)
+                : 0
               return (
                 <Flex key={p.num} align="center" gap={3}>
                   <Text fontSize="xs" color="gray.500" w="28px">{p.num}</Text>
@@ -125,25 +127,26 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
               )
             })}
           </Flex>
+
           {/* Notes */}
-{(item.notes || isAdmin) && (
-  <>
-    <Divider borderColor="blue.100" my={4} />
-    <Text fontSize="xs" fontWeight="600" color="gray.500"
-      textTransform="uppercase" letterSpacing="0.08em" mb={2}>
-      Notes
-    </Text>
-    {item.notes ? (
-      <Text fontSize="sm" color="gray.700" whiteSpace="pre-wrap">
-        {item.notes}
-      </Text>
-    ) : (
-      <Text fontSize="sm" color="gray.400" fontStyle="italic">
-        No notes for this item.
-      </Text>
-    )}
-  </>
-)}
+          {(item.notes || isAdmin) && (
+            <>
+              <Divider borderColor="blue.100" my={4} />
+              <Text fontSize="xs" fontWeight="600" color="gray.500"
+                textTransform="uppercase" letterSpacing="0.08em" mb={2}>
+                Notes
+              </Text>
+              {item.notes ? (
+                <Text fontSize="sm" color="gray.700" whiteSpace="pre-wrap">
+                  {item.notes}
+                </Text>
+              ) : (
+                <Text fontSize="sm" color="gray.400" fontStyle="italic">
+                  No notes for this item.
+                </Text>
+              )}
+            </>
+          )}
         </Box>
 
         {/* Right — photos */}
@@ -153,13 +156,12 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
             Photos {photos.length > 0 && `(${photos.length})`}
           </Text>
 
-          {/* Photo grid */}
           {photos.length > 0 ? (
             <Flex flexWrap="wrap" gap={2} mb={2}>
               {photos.map((photo, index) => (
                 <Box key={photo.id} position="relative" role="group">
                   <Image
-                    src={`http://localhost:5001${photo.url}`}
+                    src={`${import.meta.env.VITE_UPLOADS_URL || ''}${photo.url}`}
                     alt={`${item.name} photo ${index + 1}`}
                     w="96px"
                     h="96px"
@@ -198,7 +200,6 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
             </Flex>
           )}
 
-          {/* Upload button — admin only */}
           {isAdmin && (
             <>
               <input type="file" accept="image/*" ref={fileRef}
@@ -220,7 +221,6 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
           <ModalCloseButton color="white" zIndex={10} />
           <Flex align="center" justify="center" position="relative" px={10}>
 
-            {/* Left arrow */}
             {photos.length > 1 && (
               <IconButton
                 aria-label="Previous photo"
@@ -234,19 +234,17 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
               />
             )}
 
-            {/* Image */}
             {photos[lightboxIndex] && (
               <Image
-                src={`http://localhost:5001${photos[lightboxIndex].url}`}
+                src={`${import.meta.env.VITE_UPLOADS_URL || ''}${photos[lightboxIndex].url}`}
                 alt={item.name}
                 maxH="90vh"
-                maxW="85vW"
+                maxW="85vw"
                 objectFit="contain"
                 borderRadius="lg"
               />
             )}
 
-            {/* Right arrow */}
             {photos.length > 1 && (
               <IconButton
                 aria-label="Next photo"
@@ -261,7 +259,6 @@ export default function ItemDetailPanel({ item, isAdmin, onPhotoUpdate, onPhotoD
             )}
           </Flex>
 
-          {/* Photo counter */}
           {photos.length > 1 && (
             <Text textAlign="center" color="whiteAlpha.700" fontSize="sm" mt={3}>
               {lightboxIndex + 1} / {photos.length}
